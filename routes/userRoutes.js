@@ -6,8 +6,8 @@ const router = express.Router();
 
 router.post('/register', UserController.register);
 router.post('/login', UserController.login);
-router.get('/list', checkJWT, isAdmin, UserController.get);
-router.get('/:id', checkJWT, isAdmin, UserController.getById);
+router.get('/list', UserController.get);
+router.get('/:id', UserController.getById);
 router.put('/:id', checkJWT, isAdmin, UserController.updateActive);
 
 module.exports = router;
