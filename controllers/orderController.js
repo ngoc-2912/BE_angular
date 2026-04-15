@@ -42,6 +42,7 @@ class OrderController {
             attributes: ["id", "product_id", "quantity", "price"],
           },
         ],
+        order: [["id", "DESC"]],
       });
       res.status(200).json({
         status: 200,

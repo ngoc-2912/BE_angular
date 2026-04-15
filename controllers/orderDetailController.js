@@ -16,7 +16,8 @@ class OrderDetailController {
                         model: ProductModel,
                         attributes: ['id', 'name', 'price']
                     }
-                ]
+                ],
+                order: [['id', 'DESC']]
             });
             res.status(200).json({
                 "status": 200,

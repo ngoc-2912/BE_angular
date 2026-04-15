@@ -12,6 +12,7 @@ class ProductController {
             attributes: ["id", "name"],
           },
         ],
+        order: [["id", "DESC"]],
       });
       res.status(200).json({
         status: 200,

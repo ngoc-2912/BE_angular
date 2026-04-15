@@ -5,7 +5,9 @@ const slugify = require("slugify");
 class CategoryController {
   static async get(req, res) {
     try {
-      const categories = await CategoryModel.findAll();
+      const categories = await CategoryModel.findAll({
+        order: [["id", "DESC"]],
+      });
       res.status(200).json({
         status: 200,
         message: "Lấy danh sách thành công",

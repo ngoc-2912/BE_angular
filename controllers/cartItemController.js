@@ -17,6 +17,7 @@ class CartItemController {
             attributes: ["id", "name", "price"],
           },
         ],
+        order: [["id", "DESC"]],
       });
 
       return res.status(200).json({

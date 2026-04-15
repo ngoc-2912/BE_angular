@@ -8,6 +8,7 @@ class UserController {
     try {
       const users = await User.findAll({
         attributes: { exclude: ["password"] },
+        order: [["id", "DESC"]],
       });
 
       return res.status(200).json({
