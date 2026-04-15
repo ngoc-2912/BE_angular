@@ -5,8 +5,8 @@ const OrderController = require('../controllers/orderController');
 
 router.get('/orders/list', OrderController.get);
 router.get('/orders/:id', OrderController.getById);
-router.post('/orders/add', checkJWT, isAdmin, OrderController.create);
-router.put("/orders/:id", checkJWT, isAdmin, OrderController.update);
+router.post('/orders/add', checkJWT, OrderController.create);
+router.put("/orders/:id", checkJWT, OrderController.update);
 router.delete("/orders/:id", checkJWT, isAdmin, OrderController.delete);
 
 module.exports = router;

@@ -85,9 +85,21 @@ class OrderController {
 
   static async create(req, res) {
     try {
-      const { user_id, total_price, status } = req.body;
+      const { full_name, email, phone, address, payment_method, note, total_price, status } = req.body;
+      const user_id = req.user?.id;
 
       const code = "ORD-" + Date.now();
+
+      if (!user_id) {
+        return res.status(401).json({ message: "Token không hợp lệ!" });
+      }
+
+      if (!full_name || !email || !phone || !address || !payment_method) {
+        return res.status(400).json({
+          status: 400,
+          message: "Thông tin người nhận không được để trống",
+        });
+      }
 
       if (!total_price) {
         return res.status(400).json({
@@ -103,31 +115,34 @@ class OrderController {
         });
       }
 
-      if (user_id) {
-        const user = await UserModel.findByPk(user_id);
-        if (!user) {
-          return res.status(404).json({ message: "Id không tồn tại" });
-        }
+      const user = await UserModel.findByPk(user_id);
+      if (!user) {
+        return res.status(404).json({ message: "Id không tồn tại" });
       }
 
-      if (status && !VALID_STATUSES.includes(status)) {
+      const normalizedStatus =
+        status === undefined || status === null
+          ? "0"
+          : normalizeStatusToEnumValue(status);
+
+      if (!normalizedStatus) {
         return res.status(400).json({
           status: 400,
-          message: `Trạng thái không hợp lệ. Các trạng thái hợp lệ: ${VALID_STATUSES.join(", ")}`,
+          message: "Trạng thái không hợp lệ",
         });
       }
 
-      if (typeof status !== "number" || !Number.isInteger(status)) {
-        return res
-          .status(400)
-          .json({ message: "Trạng thái phải là số nguyên" });
-      }
-
       const order = await OrderModel.create({
+        full_name,
+        email,
+        phone,
+        address,
+        payment_method,
+        note,
         user_id,
         code,
         total_price,
-        status: status || 0,
+        status: normalizedStatus,
       });
 
       res.status(201).json({
@@ -142,19 +157,36 @@ class OrderController {
   static async update(req, res) {
     try {
       const { id } = req.params;
-      const { status } = req.body;
+      const { full_name, email, phone, address, payment_method, note, total_price, status } = req.body;
 
       const order = await OrderModel.findByPk(id);
       if (!order) {
         return res.status(404).json({ message: "Đơn hàng không tồn tại" });
       }
 
-      const normalizedStatus = normalizeStatusToEnumValue(status);
-      if (!normalizedStatus) {
-        return res.status(400).json({ message: "Trạng thái không hợp lệ" });
+      if (total_price !== undefined && total_price < 0) {
+        return res.status(400).json({
+          status: 400,
+          message: "Tổng giá tiền phải lớn hơn 0",
+        });
       }
 
-      order.status = normalizedStatus;
+      if (full_name !== undefined) order.full_name = full_name;
+      if (email !== undefined) order.email = email;
+      if (phone !== undefined) order.phone = phone;
+      if (address !== undefined) order.address = address;
+      if (payment_method !== undefined) order.payment_method = payment_method;
+      if (note !== undefined) order.note = note;
+      if (total_price !== undefined) order.total_price = total_price;
+
+      if (status !== undefined && status !== null) {
+        const normalizedStatus = normalizeStatusToEnumValue(status);
+        if (!normalizedStatus) {
+          return res.status(400).json({ message: "Trạng thái không hợp lệ" });
+        }
+        order.status = normalizedStatus;
+      }
+
       await order.save();
       await order.reload();
 
