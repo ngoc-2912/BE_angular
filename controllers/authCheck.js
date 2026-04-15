@@ -27,4 +27,11 @@ const isAdmin = (req, res, next) => {
     next();
 };
 
-module.exports = { checkJWT, isAdmin };
+const isActive = (req, res, next) => {
+    if (Number(req.user.active) !== 1) {
+        return res.status(403).json({ message: "Tài khoản của bạn không hoạt động !" });
+    }
+    next();
+};
+
+module.exports = { checkJWT, isAdmin, isActive };

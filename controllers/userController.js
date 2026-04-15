@@ -101,49 +101,54 @@ class UserController {
     }
   }
 
-static async registerAdmin(req, res) {
-  try {
-    const { full_name, email, password } = req.body;
+  static async registerAdmin(req, res) {
+    try {
+      const { full_name, email, password } = req.body;
 
-    if (!full_name || !email || !password) {
-      return res.status(400).json({
-        message: "Vui lòng nhập đầy đủ thông tin!",
+      if (!full_name || !email || !password) {
+        return res.status(400).json({
+          message: "Vui lòng nhập đầy đủ thông tin!",
+        });
+      }
+
+      const existingUser = await User.findOne({ where: { email } });
+      if (existingUser) {
+        return res.status(400).json({
+          message: "Email đã tồn tại!",
+        });
+      }
+
+      // ❗ KHÔNG HASH Ở ĐÂY
+      // model sẽ tự hash
+
+      const user = await User.create({
+        full_name,
+        email,
+        password, // <-- truyền thẳng
+        role: "1", // enum phải là string
+        active: "1",
+      });
+
+      res.status(201).json({
+        message: "Tạo tài khoản admin thành công!",
+        user: {
+          id: user.id,
+          email: user.email,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({
+        message: "Lỗi server",
+        error: error.message,
       });
     }
-
-    const existingUser = await User.findOne({ where: { email } });
-    if (existingUser) {
-      return res.status(400).json({
-        message: "Email đã tồn tại!",
-      });
-    }
-
-    // ❗ KHÔNG HASH Ở ĐÂY
-    // model sẽ tự hash
-
-    const user = await User.create({
-      full_name,
-      email,
-      password,   // <-- truyền thẳng
-      role: "1",  // enum phải là string
-      active: "1",
-    });
-
-    res.status(201).json({
-      message: "Tạo tài khoản admin thành công!",
-      user: {
-        id: user.id,
-        email: user.email,
-      },
-    });
-
-  } catch (error) {
-    res.status(500).json({
-      message: "Lỗi server",
-      error: error.message,
-    });
   }
-}
+
+  static async checkEmail(req, res) {
+    const { email } = req.body;
+    const user = await User.findOne({ where: { email } });
+    res.json({ exists: !!user });
+  }
 
   static async login(req, res) {
     try {
