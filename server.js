@@ -10,6 +10,7 @@ const orderRoutes = require("./routes/orderRoutes");
 const orderDetailRoutes = require("./routes/orderDetailRoutes");
 const cartRoutes = require("./routes/cartRoutes");
 const cartItemRoutes = require("./routes/cartItemRoutes");
+const variantRoutes = require("./routes/variantRoutes");
 app.use(express.json());
 
 app.use(cors({
@@ -25,6 +26,7 @@ app.use(orderRoutes);
 app.use(orderDetailRoutes);
 app.use(cartRoutes);
 app.use(cartItemRoutes);
+app.use(variantRoutes);
 
 app.listen(port, () => {
     console.log('running http://localhost:3000');
