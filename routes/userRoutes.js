@@ -6,6 +6,7 @@ const router = express.Router();
 
 router.post("/register", UserController.register);
 router.post("/login", UserController.login);
+router.get("/profile", checkJWT, UserController.profile);
 router.get("/list", UserController.get);
 router.get("/:id", checkJWT, UserController.getById);
 router.post("/check-email", UserController.checkEmail);

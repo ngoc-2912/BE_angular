@@ -4,6 +4,34 @@ const jwt = require("jsonwebtoken");
 const JWT_SECRET = process.env.JWT_SECRET;
 
 class UserController {
+  static async profile(req, res) {
+    try {
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ message: "Token không hợp lệ!" });
+      }
+
+      const user = await User.findByPk(userId, {
+        attributes: { exclude: ["password"] },
+      });
+
+      if (!user) {
+        return res.status(404).json({ message: "Người dùng không tồn tại" });
+      }
+
+      return res.status(200).json({
+        status: 200,
+        message: "Lấy thông tin tài khoản thành công",
+        data: user,
+      });
+    } catch (error) {
+      return res
+        .status(500)
+        .json({ message: "Lỗi server", error: error.message });
+    }
+  }
+
   static async get(req, res) {
     try {
       const users = await User.findAll({
