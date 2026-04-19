@@ -84,12 +84,19 @@ class ProductController {
 
  static async get(req, res) {
   try {
-    // Lấy page từ query, mặc định là trang 1, mỗi trang 6 sản phẩm
     const page = parseInt(req.query.page) || 1;
     const limit = 6;
-    const offset = (page - 1) * limit;76
+    const offset = (page - 1) * limit;
+    
+    // Kiểm tra xem đây có phải yêu cầu từ trang Admin không
+    const isAdmin = req.query.isAdmin === 'true';
+
+    // Tạo điều kiện lọc
+    // Nếu là Admin thì để trống (lấy hết), nếu không phải thì lọc status = '1'
+    const whereCondition = isAdmin ? {} : { status: '1' };
 
     const { count, rows } = await ProductModel.findAndCountAll({
+      where: whereCondition, // Sử dụng điều kiện vừa tạo
       include: [
         {
           model: CategoryModel,
@@ -104,9 +111,9 @@ class ProductController {
     res.status(200).json({
       status: 200,
       message: "Lấy danh sách thành công",
-      data: rows, // Danh sách sản phẩm của trang hiện tại
-      totalItems: count, // Tổng số sản phẩm trong DB
-      totalPages: Math.ceil(count / limit), // Tổng số trang
+      data: rows,
+      totalItems: count,
+      totalPages: Math.ceil(count / limit),
       currentPage: page
     });
   } catch (error) {
