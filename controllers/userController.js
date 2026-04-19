@@ -32,6 +32,7 @@ class UserController {
     }
   }
 
+  // Lấy danh sách tất cả người dùng (Cho Admin)
   static async get(req, res) {
     try {
       const users = await User.findAll({
@@ -51,11 +52,22 @@ class UserController {
     }
   }
 
+  // Lấy chi tiết 1 người dùng theo ID
   static async getById(req, res) {
     try {
       const { id } = req.params;
       const user = await User.findByPk(id, {
-        attributes: { exclude: ["password"] },
+        attributes: [
+          "id",
+          "full_name",
+          "email",
+          "phone",
+          "address",
+          "role",
+          "active",
+          "created_at",
+          "updated_at",
+        ],
       });
 
       if (!user) {
@@ -73,6 +85,35 @@ class UserController {
     }
   }
 
+  // Lấy thông tin của chính người dùng đang đăng nhập
+  static async getMe(req, res) {
+    try {
+      const user = await User.findByPk(req.user.id, {
+        attributes: [
+          "id",
+          "full_name",
+          "email",
+          "phone",
+          "address",
+          "role",
+          "active",
+          "created_at",
+          "updated_at",
+        ],
+      });
+
+      if (!user)
+        return res.status(404).json({ message: "Người dùng không tồn tại" });
+
+      return res.status(200).json({ status: 200, data: user });
+    } catch (error) {
+      return res
+        .status(500)
+        .json({ message: "Lỗi server", error: error.message });
+    }
+  }
+
+  // Cập nhật trạng thái hoạt động (Khóa/Mở tài khoản)
   static async updateActive(req, res) {
     try {
       const { id } = req.params;
@@ -109,10 +150,10 @@ class UserController {
     }
   }
 
+  // Đăng ký tài khoản người dùng (Khách hàng)
   static async register(req, res) {
     try {
       const { full_name, email, password } = req.body;
-      console.log(req.body);
 
       const existingUser = await User.findOne({ where: { email } });
       if (existingUser) {
@@ -130,6 +171,7 @@ class UserController {
     }
   }
 
+  // Đăng ký tài khoản Admin (Mặc định role = 1)
   static async registerAdmin(req, res) {
     try {
       const { full_name, email, password } = req.body;
@@ -147,14 +189,11 @@ class UserController {
         });
       }
 
-      // ❗ KHÔNG HASH Ở ĐÂY
-      // model sẽ tự hash
-
       const user = await User.create({
         full_name,
         email,
-        password, // <-- truyền thẳng
-        role: "1", // enum phải là string
+        password, 
+        role: "1", 
         active: "1",
       });
 
@@ -173,17 +212,22 @@ class UserController {
     }
   }
 
+  // Kiểm tra sự tồn tại của email
   static async checkEmail(req, res) {
-    const { email } = req.body;
-    const user = await User.findOne({ where: { email } });
-    res.json({ exists: !!user });
+    try {
+      const { email } = req.body;
+      const user = await User.findOne({ where: { email } });
+      res.json({ exists: !!user });
+    } catch (error) {
+      res.status(500).json({ message: "Lỗi server" });
+    }
   }
 
+  // Đăng nhập
   static async login(req, res) {
     try {
       const { email, password } = req.body;
 
-      // kiểm tra thiếu dữ liệu
       if (!email || !password) {
         return res.status(400).json({
           messageAlert: "Vui lòng nhập đầy đủ email và mật khẩu!",
@@ -192,21 +236,18 @@ class UserController {
 
       const user = await User.findOne({ where: { email } });
 
-      // sai email
       if (!user) {
         return res.status(400).json({
           messageAlert: "Email hoặc mật khẩu không chính xác!",
         });
       }
 
-      // tài khoản bị khóa
       if (user.active === "0") {
         return res.status(403).json({
           messageAlert: "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ admin!",
         });
       }
 
-      // sai mật khẩu
       const isMatch = await bcrypt.compare(password, user.password);
       if (!isMatch) {
         return res.status(400).json({
@@ -214,7 +255,6 @@ class UserController {
         });
       }
 
-      // tạo token
       const token = jwt.sign(
         {
           id: user.id,
@@ -226,7 +266,6 @@ class UserController {
         { expiresIn: "1h" },
       );
 
-      // login thành công
       return res.status(200).json({
         messageAlert: "Đăng nhập thành công!",
         token,

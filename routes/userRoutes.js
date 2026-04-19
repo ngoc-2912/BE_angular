@@ -12,4 +12,7 @@ router.get("/:id", checkJWT, UserController.getById);
 router.post("/check-email", UserController.checkEmail);
 router.put("/:id", checkJWT, isAdmin, UserController.updateActive);
 router.post("/admin-register", checkJWT, isAdmin, UserController.registerAdmin);
+router.get("/me", checkJWT, UserController.getMe);
 module.exports = router;
+
+
