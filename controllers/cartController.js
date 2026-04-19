@@ -1,8 +1,24 @@
 const CartModel = require("../models/cart");
 const UserModel = require("../models/user");
 const CartItemModel = require("../models/cartItem");
+const ProductModel = require("../models/product");
+const VariantModel = require("../models/variant");
 
 class CartController {
+  static formatCartItem(cartItem) {
+    const item = cartItem?.toJSON ? cartItem.toJSON() : cartItem;
+    const variantProductName = item.Variant?.Product?.name ?? null;
+    const variantName = item.Variant?.name ?? null;
+    const { Product, Variant, ...rest } = item;
+
+    return {
+      ...rest,
+      name: item.variant_id
+        ? [variantProductName, variantName].filter(Boolean).join(" - ") || variantName
+        : item.Product?.name ?? null,
+      image: item.variant_id ? item.Variant?.image ?? null : item.Product?.image ?? null,
+    };
+  }
   static async get(req, res) {
     try {
       const userId = req.user?.id;
@@ -16,7 +32,23 @@ class CartController {
         include: [
           {
             model: CartItemModel,
-            attributes: ["id", "cart_id", "product_id", "quantity", "price"],
+            attributes: ["id", "cart_id", "product_id", "variant_id", "quantity", "price"],
+            include: [
+              {
+                model: ProductModel,
+                attributes: ["id", "name", "image"],
+              },
+              {
+                model: VariantModel,
+                attributes: ["id", "product_id", "name", "image"],
+                include: [
+                  {
+                    model: ProductModel,
+                    attributes: ["id", "name"],
+                  },
+                ],
+              },
+            ],
           },
         ],
       });
@@ -25,10 +57,15 @@ class CartController {
         return res.status(404).json({ message: "Giỏ hàng không tồn tại" });
       }
 
+      const formattedCart = cart.toJSON();
+      formattedCart.CartItems = (cart.CartItems || []).map((item) =>
+        CartController.formatCartItem(item),
+      );
+
       return res.status(200).json({
         status: 200,
         message: "Lấy danh sách thành công",
-        data: cart,
+        data: formattedCart,
       });
     } catch (error) {
       return res.status(500).json({ error: error.message });
@@ -47,7 +84,23 @@ class CartController {
           },
           {
             model: CartItemModel,
-            attributes: ["id", "cart_id", "product_id", "quantity", "price"],
+            attributes: ["id", "cart_id", "product_id", "variant_id", "quantity", "price"],
+            include: [
+              {
+                model: ProductModel,
+                attributes: ["id", "name", "image"],
+              },
+              {
+                model: VariantModel,
+                attributes: ["id", "product_id", "name", "image"],
+                include: [
+                  {
+                    model: ProductModel,
+                    attributes: ["id", "name"],
+                  },
+                ],
+              },
+            ],
           },
         ],
       });
@@ -56,9 +109,14 @@ class CartController {
         return res.status(404).json({ message: "Id không tồn tại" });
       }
 
+      const formattedCart = cart.toJSON();
+      formattedCart.CartItems = (cart.CartItems || []).map((item) =>
+        CartController.formatCartItem(item),
+      );
+
       return res.status(200).json({
         status: 200,
-        data: cart,
+        data: formattedCart,
       });
     } catch (error) {
       return res.status(500).json({ error: error.message });
@@ -78,7 +136,23 @@ class CartController {
           },
           {
             model: CartItemModel,
-            attributes: ["id", "cart_id", "product_id", "quantity", "price"],
+            attributes: ["id", "cart_id", "product_id", "variant_id", "quantity", "price"],
+            include: [
+              {
+                model: ProductModel,
+                attributes: ["id", "name", "image"],
+              },
+              {
+                model: VariantModel,
+                attributes: ["id", "product_id", "name", "image"],
+                include: [
+                  {
+                    model: ProductModel,
+                    attributes: ["id", "name"],
+                  },
+                ],
+              },
+            ],
           },
         ],
       });
@@ -87,9 +161,14 @@ class CartController {
         return res.status(404).json({ message: "Id không tồn tại" });
       }
 
+      const formattedCart = cart.toJSON();
+      formattedCart.CartItems = (cart.CartItems || []).map((item) =>
+        CartController.formatCartItem(item),
+      );
+
       return res.status(200).json({
         status: 200,
-        data: cart,
+        data: formattedCart,
       });
     } catch (error) {
       return res.status(500).json({ error: error.message });

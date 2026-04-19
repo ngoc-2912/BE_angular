@@ -1,8 +1,27 @@
 const OrderDetailModel = require('../models/orderDetail');
 const OrderModel = require('../models/order');
 const ProductModel = require('../models/product');
+const VariantModel = require('../models/variant');
 
 class OrderDetailController {
+    static composeVariantName(variant) {
+        const productName = variant?.Product?.name ?? null;
+        const variantName = variant?.name ?? null;
+        return [productName, variantName].filter(Boolean).join(" - ") || variantName || null;
+    }
+
+    static formatOrderDetail(orderDetail) {
+        const item = orderDetail?.toJSON ? orderDetail.toJSON() : orderDetail;
+        const composedVariantName = OrderDetailController.composeVariantName(item.Variant);
+        const { Product, Variant, ...rest } = item;
+
+        return {
+            ...rest,
+            name: item.variant_id
+                ? (composedVariantName ?? item.name ?? null)
+                : (item.Product?.name ?? item.name ?? null),
+        };
+    }
 
     static async get(req, res) {
         try {
@@ -15,6 +34,16 @@ class OrderDetailController {
                     {
                         model: ProductModel,
                         attributes: ['id', 'name', 'price']
+                    },
+                    {
+                        model: VariantModel,
+                        attributes: ['id', 'product_id', 'name', 'price'],
+                        include: [
+                            {
+                                model: ProductModel,
+                                attributes: ['id', 'name']
+                            }
+                        ]
                     }
                 ],
                 order: [['id', 'DESC']]
@@ -22,7 +51,7 @@ class OrderDetailController {
             res.status(200).json({
                 "status": 200,
                 "message": "Lấy danh sách thành công",
-                "data": orderDetails,  
+                "data": orderDetails.map((item) => OrderDetailController.formatOrderDetail(item)),  
             });
         } catch (error) {
             res.status(500).json({ error: error.message });
@@ -42,6 +71,16 @@ class OrderDetailController {
                     {
                         model: ProductModel,
                         attributes: ['id', 'name', 'price']
+                    },
+                    {
+                        model: VariantModel,
+                        attributes: ['id', 'product_id', 'name', 'price'],
+                        include: [
+                            {
+                                model: ProductModel,
+                                attributes: ['id', 'name']
+                            }
+                        ]
                     }
                 ]
             });
@@ -52,7 +91,7 @@ class OrderDetailController {
 
             res.status(200).json({
                 "status": 200,
-                "data": orderDetail
+                "data": OrderDetailController.formatOrderDetail(orderDetail)
             });
         } catch (error) {
             res.status(500).json({ error: error.message });
@@ -74,6 +113,16 @@ class OrderDetailController {
                     {
                         model: ProductModel,
                         attributes: ['id', 'name', 'price']
+                    },
+                    {
+                        model: VariantModel,
+                        attributes: ['id', 'product_id', 'name', 'price'],
+                        include: [
+                            {
+                                model: ProductModel,
+                                attributes: ['id', 'name']
+                            }
+                        ]
                     }
                 ]
             });
@@ -81,7 +130,7 @@ class OrderDetailController {
             res.status(200).json({
                 "status": 200,
                 "message": "Lấy danh sách thành công",
-                "data": orderDetails
+                "data": orderDetails.map((item) => OrderDetailController.formatOrderDetail(item))
             });
         } catch (error) {
             res.status(500).json({ error: error.message });
@@ -90,12 +139,22 @@ class OrderDetailController {
 
     static async create(req, res) {
         try {
-            const { order_id, product_id, quantity, price } = req.body;
+            const { order_id, product_id, variant_id, quantity, price } = req.body;
 
-            if (!order_id || !product_id || !quantity || !price) {
+            if (!order_id || quantity === undefined || quantity === null || price === undefined || price === null) {
                 return res.status(400).json({ 
                     "status": 400,
                     "message": "Tất cả trường dữ liệu không được trống" 
+                });
+            }
+
+            const hasProductId = product_id !== undefined && product_id !== null;
+            const hasVariantId = variant_id !== undefined && variant_id !== null;
+
+            if (hasProductId === hasVariantId) {
+                return res.status(400).json({
+                    status: 400,
+                    message: "Chỉ được truyền product_id hoặc variant_id",
                 });
             }
 
@@ -118,21 +177,66 @@ class OrderDetailController {
                 return res.status(404).json({ message: "Id không tồn tại" });
             }
 
-            const product = await ProductModel.findByPk(product_id);
-            if (!product) {
-                return res.status(404).json({ message: "Id không tồn tại" });
+            let resolvedProductId = null;
+            let resolvedVariantId = null;
+            let itemName = "";
+
+            if (hasProductId) {
+                const product = await ProductModel.findByPk(product_id);
+                if (!product) {
+                    return res.status(404).json({ message: "Id sản phẩm không tồn tại" });
+                }
+
+                resolvedProductId = product.id;
+                itemName = product.name;
+            } else {
+                const variant = await VariantModel.findByPk(variant_id, {
+                    include: [
+                        {
+                            model: ProductModel,
+                            attributes: ['id', 'name']
+                        }
+                    ]
+                });
+                if (!variant) {
+                    return res.status(404).json({ message: "Id variant không tồn tại" });
+                }
+
+                resolvedVariantId = variant.id;
+                itemName = OrderDetailController.composeVariantName(variant);
             }
 
             const orderDetail = await OrderDetailModel.create({ 
                 order_id, 
-                product_id, 
+                product_id: resolvedProductId,
+                variant_id: resolvedVariantId,
                 quantity, 
-                price 
+                price,
+                name: itemName,
+            });
+
+            const formattedOrderDetail = await OrderDetailModel.findByPk(orderDetail.id, {
+                include: [
+                    {
+                        model: ProductModel,
+                        attributes: ['id', 'name', 'price']
+                    },
+                    {
+                        model: VariantModel,
+                        attributes: ['id', 'product_id', 'name', 'price'],
+                        include: [
+                            {
+                                model: ProductModel,
+                                attributes: ['id', 'name']
+                            }
+                        ]
+                    }
+                ]
             });
 
             res.status(201).json({
                 message: "Thêm mới thành công",
-                orderDetail
+                orderDetail: OrderDetailController.formatOrderDetail(formattedOrderDetail)
             });
         } catch (error) {
             res.status(500).json({ error: error.message });
@@ -142,7 +246,7 @@ class OrderDetailController {
     static async update(req, res) {
         try {
             const { id } = req.params;
-            const { order_id, product_id, quantity, price } = req.body;
+            const { order_id, product_id, variant_id, quantity, price } = req.body;
 
             const orderDetail = await OrderDetailModel.findByPk(id);
             if (!orderDetail) {
@@ -171,12 +275,41 @@ class OrderDetailController {
                 orderDetail.order_id = order_id;
             }
 
-            if (product_id) {
+            const hasProductId = product_id !== undefined && product_id !== null;
+            const hasVariantId = variant_id !== undefined && variant_id !== null;
+
+            if (hasProductId && hasVariantId) {
+                return res.status(400).json({
+                    status: 400,
+                    message: "Chỉ được truyền product_id hoặc variant_id",
+                });
+            }
+
+            if (hasProductId) {
                 const product = await ProductModel.findByPk(product_id);
                 if (!product) {
-                    return res.status(404).json({ message: "Id không tồn tại" });
+                    return res.status(404).json({ message: "Id sản phẩm không tồn tại" });
                 }
-                orderDetail.product_id = product_id;
+                orderDetail.product_id = product.id;
+                orderDetail.variant_id = null;
+                orderDetail.name = product.name;
+            }
+
+            if (hasVariantId) {
+                const variant = await VariantModel.findByPk(variant_id, {
+                    include: [
+                        {
+                            model: ProductModel,
+                            attributes: ['id', 'name']
+                        }
+                    ]
+                });
+                if (!variant) {
+                    return res.status(404).json({ message: "Id variant không tồn tại" });
+                }
+                orderDetail.variant_id = variant.id;
+                orderDetail.product_id = null;
+                orderDetail.name = OrderDetailController.composeVariantName(variant);
             }
 
             if (quantity) orderDetail.quantity = quantity;
@@ -184,9 +317,28 @@ class OrderDetailController {
 
             await orderDetail.save();
 
+            const formattedOrderDetail = await OrderDetailModel.findByPk(orderDetail.id, {
+                include: [
+                    {
+                        model: ProductModel,
+                        attributes: ['id', 'name', 'price']
+                    },
+                    {
+                        model: VariantModel,
+                        attributes: ['id', 'product_id', 'name', 'price'],
+                        include: [
+                            {
+                                model: ProductModel,
+                                attributes: ['id', 'name']
+                            }
+                        ]
+                    }
+                ]
+            });
+
             res.status(200).json({
                 message: "Cập nhật thành công",
-                orderDetail
+                orderDetail: OrderDetailController.formatOrderDetail(formattedOrderDetail)
             });
         } catch (error) {
             res.status(500).json({ error: error.message });

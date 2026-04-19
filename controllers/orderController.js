@@ -1,6 +1,8 @@
 const OrderModel = require("../models/order");
 const UserModel = require("../models/user");
 const OrderDetailModel = require("../models/orderDetail");
+const ProductModel = require("../models/product");
+const VariantModel = require("../models/variant");
 
 const VALID_STATUSES = [0, 1, 2, 3];
 const STATUS_TO_ENUM_VALUE = {
@@ -29,9 +31,27 @@ const normalizeStatusToEnumValue = (value) => {
 };
 
 class OrderController {
+  static formatOrderDetail(orderDetail) {
+    const item = orderDetail?.toJSON ? orderDetail.toJSON() : orderDetail;
+    const variantProductName = item.Variant?.Product?.name ?? null;
+    const variantName = item.Variant?.name ?? null;
+    const { Product, Variant, ...rest } = item;
+
+    return {
+      ...rest,
+      name: item.variant_id
+        ? [variantProductName, variantName].filter(Boolean).join(" - ") || item.name || variantName || null
+        : item.Product?.name ?? item.name ?? null,
+    };
+  }
+
   static async get(req, res) {
     try {
-      const orders = await OrderModel.findAll({
+      const page = parseInt(req.query.page) || 1;
+      const limit = 5;
+      const offset = (page - 1) * limit;
+
+      const { count, rows } = await OrderModel.findAndCountAll({
         include: [
           {
             model: UserModel,
@@ -39,15 +59,45 @@ class OrderController {
           },
           {
             model: OrderDetailModel,
-            attributes: ["id", "product_id", "quantity", "price"],
+            attributes: ["id", "product_id", "variant_id", "quantity", "price", "name"],
+            include: [
+              {
+                model: ProductModel,
+                attributes: ["id", "name"],
+              },
+              {
+                model: VariantModel,
+                attributes: ["id", "product_id", "name"],
+                include: [
+                  {
+                    model: ProductModel,
+                    attributes: ["id", "name"],
+                  },
+                ],
+              },
+            ],
           },
         ],
         order: [["id", "DESC"]],
+        limit: limit,
+        offset: offset,
       });
+
+      const formattedRows = rows.map((order) => {
+        const orderData = order.toJSON();
+        orderData.OrderDetails = (orderData.OrderDetails || []).map((item) =>
+          OrderController.formatOrderDetail(item),
+        );
+        return orderData;
+      });
+
       res.status(200).json({
         status: 200,
         message: "Lấy danh sách thành công",
-        data: orders,
+        data: formattedRows,
+        totalItems: count,
+        totalPages: Math.ceil(count / limit),
+        currentPage: page
       });
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -66,7 +116,23 @@ class OrderController {
           },
           {
             model: OrderDetailModel,
-            attributes: ["id", "product_id", "quantity", "price"],
+            attributes: ["id", "product_id", "variant_id", "quantity", "price", "name"],
+            include: [
+              {
+                model: ProductModel,
+                attributes: ["id", "name"],
+              },
+              {
+                model: VariantModel,
+                attributes: ["id", "product_id", "name"],
+                include: [
+                  {
+                    model: ProductModel,
+                    attributes: ["id", "name"],
+                  },
+                ],
+              },
+            ],
           },
         ],
       });
@@ -75,9 +141,14 @@ class OrderController {
         return res.status(404).json({ message: "Id không tồn tại" });
       }
 
+      const formattedOrder = order.toJSON();
+      formattedOrder.OrderDetails = (formattedOrder.OrderDetails || []).map((item) =>
+        OrderController.formatOrderDetail(item),
+      );
+
       res.status(200).json({
         status: 200,
-        data: order,
+        data: formattedOrder,
       });
     } catch (error) {
       res.status(500).json({ error: error.message });

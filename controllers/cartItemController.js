@@ -1,9 +1,24 @@
 const CartItemModel = require("../models/cartItem");
 const CartModel = require("../models/cart");
 const ProductModel = require("../models/product");
+const VariantModel = require("../models/variant");
 const { Op } = require("sequelize");
 
 class CartItemController {
+  static formatCartItem(cartItem) {
+    const item = cartItem?.toJSON ? cartItem.toJSON() : cartItem;
+    const variantProductName = item.Variant?.Product?.name ?? null;
+    const variantName = item.Variant?.name ?? null;
+    const { Product, Variant, ...rest } = item;
+
+    return {
+      ...rest,
+      name: item.variant_id
+        ? [variantProductName, variantName].filter(Boolean).join(" - ") || variantName
+        : item.Product?.name ?? null,
+      image: item.variant_id ? item.Variant?.image ?? null : item.Product?.image ?? null,
+    };
+  }
   static async get(req, res) {
     try {
       const cartItems = await CartItemModel.findAll({
@@ -14,7 +29,17 @@ class CartItemController {
           },
           {
             model: ProductModel,
-            attributes: ["id", "name", "price"],
+            attributes: ["id", "name", "price", "image"],
+          },
+          {
+            model: VariantModel,
+            attributes: ["id", "product_id", "name", "price", "image"],
+            include: [
+              {
+                model: ProductModel,
+                attributes: ["id", "name"],
+              },
+            ],
           },
         ],
         order: [["id", "DESC"]],
@@ -23,7 +48,7 @@ class CartItemController {
       return res.status(200).json({
         status: 200,
         message: "Lấy danh sách thành công",
-        data: cartItems,
+        data: cartItems.map((item) => CartItemController.formatCartItem(item)),
       });
     } catch (error) {
       return res.status(500).json({ error: error.message });
@@ -42,7 +67,17 @@ class CartItemController {
           },
           {
             model: ProductModel,
-            attributes: ["id", "name", "price"],
+            attributes: ["id", "name", "price", "image"],
+          },
+          {
+            model: VariantModel,
+            attributes: ["id", "product_id", "name", "price", "image"],
+            include: [
+              {
+                model: ProductModel,
+                attributes: ["id", "name"],
+              },
+            ],
           },
         ],
       });
@@ -53,7 +88,7 @@ class CartItemController {
 
       return res.status(200).json({
         status: 200,
-        data: cartItem,
+        data: CartItemController.formatCartItem(cartItem),
       });
     } catch (error) {
       return res.status(500).json({ error: error.message });
@@ -62,12 +97,22 @@ class CartItemController {
 
   static async addToCart(req, res) {
     try {
-      const { cart_id, product_id, quantity, price } = req.body;
+      const { cart_id, product_id, variant_id, quantity, price } = req.body;
 
-      if (!cart_id || !product_id || !quantity || !price) {
+      if (!cart_id || quantity === undefined || quantity === null || price === undefined || price === null) {
         return res.status(400).json({
           status: 400,
           message: "Tất cả trường dữ liệu không được trống",
+        });
+      }
+
+      const hasProductId = product_id !== undefined && product_id !== null;
+      const hasVariantId = variant_id !== undefined && variant_id !== null;
+
+      if (hasProductId === hasVariantId) {
+        return res.status(400).json({
+          status: 400,
+          message: "Chỉ được truyền product_id hoặc variant_id",
         });
       }
 
@@ -90,13 +135,31 @@ class CartItemController {
         return res.status(404).json({ message: "Id không tồn tại" });
       }
 
-      const product = await ProductModel.findByPk(product_id);
-      if (!product) {
-        return res.status(404).json({ message: "Id không tồn tại" });
+      let resolvedProductId = null;
+      let resolvedVariantId = null;
+
+      if (hasProductId) {
+        const product = await ProductModel.findByPk(product_id);
+        if (!product) {
+          return res.status(404).json({ message: "Id sản phẩm không tồn tại" });
+        }
+
+        resolvedProductId = product.id;
+      } else {
+        const variant = await VariantModel.findByPk(variant_id);
+        if (!variant) {
+          return res.status(404).json({ message: "Id variant không tồn tại" });
+        }
+
+        resolvedVariantId = variant.id;
       }
 
       const existingCartItem = await CartItemModel.findOne({
-        where: { cart_id, product_id },
+        where: {
+          cart_id,
+          product_id: resolvedProductId,
+          variant_id: resolvedVariantId,
+        },
       });
 
       if (existingCartItem) {
@@ -111,14 +174,31 @@ class CartItemController {
 
       const cartItem = await CartItemModel.create({
         cart_id,
-        product_id,
+        product_id: resolvedProductId,
+        variant_id: resolvedVariantId,
         quantity,
         price,
       });
 
+      const formattedItem = await CartItemModel.findByPk(cartItem.id, {
+        include: [
+          { model: ProductModel, attributes: ["id", "name", "image"] },
+          {
+            model: VariantModel,
+            attributes: ["id", "product_id", "name", "image"],
+            include: [
+              {
+                model: ProductModel,
+                attributes: ["id", "name"],
+              },
+            ],
+          },
+        ],
+      });
+
       return res.status(201).json({
         message: "Thêm mới thành công",
-        cartItem,
+        cartItem: CartItemController.formatCartItem(formattedItem),
       });
     } catch (error) {
       return res.status(500).json({ error: error.message });

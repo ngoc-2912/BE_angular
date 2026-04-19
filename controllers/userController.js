@@ -27,7 +27,17 @@ class UserController {
     try {
       const { id } = req.params;
       const user = await User.findByPk(id, {
-        attributes: { exclude: ["password"] },
+        attributes: [
+          "id",
+          "full_name",
+          "email",
+          "phone",
+          "address",
+          "role",
+          "active",
+          "created_at",
+          "updated_at",
+        ],
       });
 
       if (!user) {
@@ -38,6 +48,33 @@ class UserController {
         status: 200,
         data: user,
       });
+    } catch (error) {
+      return res
+        .status(500)
+        .json({ message: "Lỗi server", error: error.message });
+    }
+  }
+
+  static async getMe(req, res) {
+    try {
+      const user = await User.findByPk(req.user.id, {
+        attributes: [
+          "id",
+          "full_name",
+          "email",
+          "phone",
+          "address",
+          "role",
+          "active",
+          "created_at",
+          "updated_at",
+        ],
+      });
+
+      if (!user)
+        return res.status(404).json({ message: "Người dùng không tồn tại" });
+
+      return res.status(200).json({ status: 200, data: user });
     } catch (error) {
       return res
         .status(500)
@@ -119,7 +156,7 @@ class UserController {
         });
       }
 
-      // ❗ KHÔNG HASH Ở ĐÂY
+      // KHÔNG HASH Ở ĐÂY
       // model sẽ tự hash
 
       const user = await User.create({
