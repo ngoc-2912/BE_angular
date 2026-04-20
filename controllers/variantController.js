@@ -17,6 +17,12 @@ function normalizeText(str) {
     .toLowerCase();
 }
 
+function normalizeName(str) {
+  return String(str ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function isColorAttribute(name) {
   return COLOR_NAMES.includes(normalizeText(name));
 }
@@ -197,11 +203,16 @@ class VariantController {
         });
       }
 
-      const trimmedName = name.trim();
+      const normalizedName = normalizeName(name);
+      const siblingVariants = await VariantModel.findAll({
+        where: { product_id },
+        attributes: ["id", "name"],
+      });
+      const duplicateByName = siblingVariants.find(
+        (item) => normalizeName(item.name) === normalizedName,
+      );
 
-      if (
-        await VariantModel.findOne({ where: { product_id, name: trimmedName } })
-      )
+      if (duplicateByName)
         return res
           .status(400)
           .json({ message: "Variant đã tồn tại trong sản phẩm này" });
@@ -256,7 +267,7 @@ class VariantController {
           throw new Error("Variant phải có attributes");
 
         const newVariant = await VariantModel.create(
-          { product_id, name: trimmedName, sku: sku || null, price, image },
+          { product_id, name: normalizedName, sku: sku || null, price, image },
           { transaction: t },
         );
 
@@ -322,14 +333,20 @@ class VariantController {
         });
       }
 
-      if (name !== undefined) {
-        const duplicate = await VariantModel.findOne({
+      const targetProductId = product_id ?? variant.product_id;
+      const targetName = name !== undefined ? normalizeName(name) : normalizeName(variant.name);
+
+      if (name !== undefined || product_id !== undefined) {
+        const siblingVariants = await VariantModel.findAll({
           where: {
-            product_id: product_id ?? variant.product_id,
-            name: name.trim(),
+            product_id: targetProductId,
             id: { [Op.ne]: id },
           },
+          attributes: ["id", "name"],
         });
+        const duplicate = siblingVariants.find(
+          (item) => normalizeName(item.name) === targetName,
+        );
         if (duplicate)
           return res
             .status(400)
@@ -345,7 +362,7 @@ class VariantController {
       }
 
       if (product_id !== undefined) variant.product_id = product_id;
-      if (name !== undefined) variant.name = name.trim();
+      if (name !== undefined) variant.name = targetName;
       if (sku !== undefined) variant.sku = sku || null;
       if (price !== undefined) variant.price = price;
       if (image !== undefined) variant.image = image;
