@@ -3,6 +3,11 @@ const ProductModel = require("../models/product");
 const slugify = require("slugify");
 
 class CategoryController {
+  static normalizeName(value) {
+    if (typeof value !== "string") return "";
+    return value.replace(/\s+/g, " ").trim();
+  }
+
   static async get(req, res) {
     try {
       const categories = await CategoryModel.findAll({
@@ -46,7 +51,11 @@ class CategoryController {
         });
       }
 
-      const existingName = await CategoryModel.findOne({ where: { name } });
+      const normalizedName = CategoryController.normalizeName(name);
+      const categories = await CategoryModel.findAll({ attributes: ["id", "name"] });
+      const existingName = categories.find(
+        (item) => CategoryController.normalizeName(item.name) === normalizedName
+      );
       if (existingName) {
         return res.status(400).json({ message: "Tên danh mục đã tồn tại" });
       }
@@ -85,8 +94,12 @@ class CategoryController {
         });
       }
 
-      const existingName = await CategoryModel.findOne({ where: { name } });
-      if (existingName && existingName.id != id) {
+      const normalizedName = CategoryController.normalizeName(name);
+      const categories = await CategoryModel.findAll({ attributes: ["id", "name"] });
+      const existingName = categories.find(
+        (item) => CategoryController.normalizeName(item.name) === normalizedName && item.id != id
+      );
+      if (existingName) {
         return res.status(400).json({ message: "Tên danh mục đã tồn tại" });
       }
 
